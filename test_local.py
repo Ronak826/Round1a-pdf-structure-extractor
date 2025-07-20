@@ -1,89 +1,78 @@
-#!/usr/bin/env python3
-"""
-Local test script for PDF Outline Extractor
-Run this to test the extraction logic without Docker
-"""
+# test_local.py
 
 import sys
-import os
+import json
 from pathlib import Path
 
-# Add the current directory to Python path
-sys.path.insert(0, str(Path(__file__).parent))
+# Import the extractor
+from process_pdfs import PDFOutlineExtractor
 
-try:
-    from process_pdfs import PDFOutlineExtractor
-    print("✅ Successfully imported PDFOutlineExtractor")
-except ImportError as e:
-    print(f"❌ Failed to import PDFOutlineExtractor: {e}")
-    print("Make sure you have PyMuPDF installed:")
-    print("pip install PyMuPDF==1.23.14")
-    sys.exit(1)
+def test_corrected_extractor():
+    """Test the PDF outline extractor"""
+    print("🔍 Testing PDF Outline Extractor...")
 
-def test_extractor():
-    """Test the PDF extractor with sample data"""
-    print("\n🔍 Testing PDF Outline Extractor...")
-    
-    # Check if input directory exists
+    # Input and output directories
     input_dir = Path("input")
-    if not input_dir.exists():
-        print(f"📁 Creating input directory: {input_dir}")
-        input_dir.mkdir()
-    
-    # Check if output directory exists
     output_dir = Path("output")
-    if not output_dir.exists():
-        print(f"📁 Creating output directory: {output_dir}")
-        output_dir.mkdir()
-    
-    # Look for PDF files
+
+    # Create directories if they don't exist
+    input_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True)
+
+    # Find all PDFs in input/
     pdf_files = list(input_dir.glob("*.pdf"))
-    
+
     if not pdf_files:
         print("⚠️  No PDF files found in input directory")
         print("📝 Please place some PDF files in the 'input' folder and run again")
         return
-    
-    print(f"📄 Found {len(pdf_files)} PDF file(s):")
-    for pdf in pdf_files:
-        print(f"   - {pdf.name}")
-    
-    # Initialize extractor
+
+    # Initialize the extractor
     extractor = PDFOutlineExtractor()
-    
-    # Test each PDF
+
     for pdf_file in pdf_files:
-        print(f"\n🔄 Processing: {pdf_file.name}")
-        
+        print(f"\n📄 Processing: {pdf_file.name}")
+
         try:
-            # Extract outline
-            outline = extractor.extract_outline(str(pdf_file))
-            
-            # Print results
-            print(f"📋 Title: {outline['title']}")
-            print(f"📑 Found {len(outline['outline'])} headings:")
-            
-            for heading in outline['outline'][:5]:  # Show first 5 headings
-                print(f"   {heading['level']}: {heading['text']} (page {heading['page']})")
-            
-            if len(outline['outline']) > 5:
-                print(f"   ... and {len(outline['outline']) - 5} more headings")
-            
-            # Save to output
-            import json
-            output_file = output_dir / f"{pdf_file.stem}.json"
+            # Process the PDF to extract title + outline
+            result = extractor.process_pdf(str(pdf_file))
+
+            # Create output filename
+            output_file = output_dir / f"{pdf_file.stem}_corrected.json"
+
+            # Write result to JSON
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(outline, f, indent=2, ensure_ascii=False)
-            
+                json.dump(result, f, indent=2, ensure_ascii=False)
+
+            print(f"✅ Successfully processed {pdf_file.name}")
+            print(f"📄 Title: {result['title']}")
+            print(f"📊 Outline entries: {len(result['outline'])}")
+
+            # Example: special check for certain files
+            if 'ltc' in pdf_file.name.lower() or 'application' in pdf_file.name.lower():
+                print("🔍 Form detected - Expected empty outline")
+                if len(result['outline']) == 0:
+                    print("✅ CORRECT: Empty outline for form document")
+                else:
+                    print("❌ INCORRECT: Form should have empty outline")
+
             print(f"💾 Saved to: {output_file}")
-            
+
+            # Preview first few outline items
+            if result['outline']:
+                print("📝 Outline preview:")
+                for i, heading in enumerate(result['outline'][:5]):
+                    print(f"   {heading['level']}: {heading['text']} (page {heading['page']})")
+                if len(result['outline']) > 5:
+                    print(f"   ... and {len(result['outline']) - 5} more headings")
+            else:
+                print("📝 No headings found (this is correct for forms)")
+
         except Exception as e:
-            print(f"❌ Error processing {pdf_file.name}: {str(e)}")
-    
-    print("\n✅ Local test completed!")
-    print("🐳 If everything looks good, you can now use Docker:")
-    print("   - Windows: run 'build.bat' then 'run.bat'")
-    print("   - Linux/Mac: run './build.sh' then './run.sh'")
+            print(f"❌ Error processing {pdf_file.name}: {e}")
+
+        print("-" * 60)
+
 
 if __name__ == "__main__":
-    test_extractor()
+    test_corrected_extractor()

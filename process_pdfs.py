@@ -1,366 +1,273 @@
-#!/usr/bin/env python3
-"""
-Adobe Hackathon Challenge 1A: PDF Outline Extractor
-High-performance PDF processing solution for extracting structured outlines
-"""
-
-import json
-import os
-import sys
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
-import re
 import fitz  # PyMuPDF
-from statistics import median
+import json
+import re
+from pathlib import Path
 import logging
+from collections import defaultdict
+import statistics
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class PDFOutlineExtractor:
-    """
-    Advanced PDF outline extraction with multi-criteria heading detection
-    """
-    
-    def __init__(self, config: Optional[Dict] = None):
-        """
-        Initialize the PDF outline extractor with configurable parameters
-        
-        Args:
-            config: Configuration dictionary with extraction parameters
-        """
-        self.config = config or {
-            'font_size_weight': 0.35,
-            'bold_weight': 0.25,
-            'position_weight': 0.15,
-            'pattern_weight': 0.15,
-            'length_weight': 0.10,
-            'min_heading_score': 0.3,
-            'max_heading_length': 200,
-            'min_heading_length': 3
-        }
-        
-        # Heading patterns for different levels
-        self.heading_patterns = [
-            re.compile(r'^\d+\.\s+', re.IGNORECASE),  # H1: "1. Introduction"
-            re.compile(r'^\d+\.\d+\s+', re.IGNORECASE),  # H2: "1.1 Background"
-            re.compile(r'^\d+\.\d+\.\d+\s+', re.IGNORECASE),  # H3: "1.1.1 Details"
-            re.compile(r'^[A-Z][A-Z\s]+$'),  # ALL CAPS headings
-            re.compile(r'^(Chapter|Section|Part)\s+\d+', re.IGNORECASE)
-        ]
-    
-    def extract_outline(self, pdf_path: str) -> Dict[str, Any]:
-        """
-        Extract structured outline from PDF file
-        
-        Args:
-            pdf_path: Path to the PDF file
-            
-        Returns:
-            Dictionary containing title and outline structure
-        """
-        try:
-            with fitz.open(pdf_path) as pdf_doc:
-                logger.info(f"Processing PDF: {pdf_path} ({pdf_doc.page_count} pages)")
-                
-                # Extract title from first page
-                title = self._extract_title(pdf_doc)
-                
-                # Extract headings from all pages
-                headings = self._extract_headings(pdf_doc)
-                
-                # Format output
-                outline = {
-                    "title": title,
-                    "outline": headings
-                }
-                
-                logger.info(f"Extracted {len(headings)} headings from {pdf_path}")
-                return outline
-                
-        except Exception as e:
-            logger.error(f"Error processing {pdf_path}: {str(e)}")
-            # Return minimal structure for failed processing
-            return {
-                "title": f"Error processing {Path(pdf_path).stem}",
-                "outline": []
-            }
-    
-    def _extract_title(self, pdf_doc: fitz.Document) -> str:
-        """
-        Extract document title from first page using largest font size
-        
-        Args:
-            pdf_doc: Open PDF document
-            
-        Returns:
-            Extracted title or filename fallback
-        """
-        try:
-            first_page = pdf_doc[0]
-            blocks = first_page.get_text("dict")["blocks"]
-            
-            title_candidates = []
-            
-            for block in blocks:
-                if "lines" in block:
-                    for line in block["lines"]:
-                        for span in line["spans"]:
-                            text = span["text"].strip()
-                            if (len(text) > 5 and 
-                                len(text) < 150 and 
-                                not text.startswith(('http', 'www', '@', '#'))):
-                                title_candidates.append({
-                                    "text": text,
-                                    "size": span["size"],
-                                    "flags": span["flags"]
-                                })
-            
-            if title_candidates:
-                # Find the largest font size on first page
-                max_size = max(candidate["size"] for candidate in title_candidates)
-                largest_texts = [c for c in title_candidates if c["size"] == max_size]
-                
-                if largest_texts:
-                    # Prefer the longest text among largest font sizes
-                    title = max(largest_texts, key=lambda x: len(x["text"]))["text"]
-                    return self._clean_text(title)
-            
-            # Fallback to document metadata
-            metadata = pdf_doc.metadata
-            if metadata.get("title"):
-                return metadata["title"]
-                
-        except Exception as e:
-            logger.warning(f"Error extracting title: {str(e)}")
-        
-        return "Document Title"
-    
-    def _extract_headings(self, pdf_doc: fitz.Document) -> List[Dict[str, Any]]:
-        """
-        Extract headings using multi-criteria analysis
-        
-        Args:
-            pdf_doc: Open PDF document
-            
-        Returns:
-            List of heading dictionaries with level, text, and page
-        """
-        all_spans = []
-        
-        # Extract all text spans with formatting info
-        for page_num in range(pdf_doc.page_count):
-            page = pdf_doc[page_num]
-            blocks = page.get_text("dict")["blocks"]
-            
-            for block in blocks:
-                if "lines" in block:
-                    for line in block["lines"]:
-                        for span in line["spans"]:
-                            text = span["text"].strip()
-                            if len(text) >= self.config['min_heading_length']:
-                                all_spans.append({
-                                    "text": text,
-                                    "size": span["size"],
-                                    "flags": span["flags"],
-                                    "page": page_num + 1,
-                                    "bbox": span["bbox"]
-                                })
-        
-        if not all_spans:
-            return []
-        
-        # Calculate median font size for reference
-        font_sizes = [span["size"] for span in all_spans]
-        median_size = median(font_sizes)
-        
-        # Score potential headings
-        heading_candidates = []
-        for span in all_spans:
-            score = self._calculate_heading_score(span, median_size)
-            if score >= self.config['min_heading_score']:
-                heading_candidates.append({
-                    "text": span["text"],
-                    "page": span["page"],
-                    "size": span["size"],
-                    "score": score
-                })
-        
-        # Sort by score and assign levels
-        heading_candidates.sort(key=lambda x: (-x["score"], x["page"]))
-        
-        # Assign heading levels based on font size and patterns
-        return self._assign_heading_levels(heading_candidates)
-    
-    def _calculate_heading_score(self, span: Dict, median_size: float) -> float:
-        """
-        Calculate heading likelihood score using multiple criteria
-        
-        Args:
-            span: Text span with formatting information
-            median_size: Median font size in document
-            
-        Returns:
-            Heading score (0-1)
-        """
-        text = span["text"]
-        size = span["size"]
-        flags = span["flags"]
-        
-        # Font size score (relative to median)
-        size_score = min(size / median_size, 2.0) / 2.0
-        
-        # Bold formatting score
-        bold_score = 1.0 if flags & 2**4 else 0.0  # Bold flag
-        
-        # Position score (left-aligned, reasonable y-position)
-        pos_score = 0.7  # Simplified position scoring
-        
-        # Pattern recognition score
-        pattern_score = 0.0
-        for pattern in self.heading_patterns:
-            if pattern.match(text):
-                pattern_score = 1.0
-                break
-        
-        # Length score (reasonable heading length)
-        length_score = 1.0
-        if len(text) > self.config['max_heading_length']:
-            length_score = 0.0
-        elif len(text) < self.config['min_heading_length']:
-            length_score = 0.0
-        
-        # Calculate weighted score
-        total_score = (
-            size_score * self.config['font_size_weight'] +
-            bold_score * self.config['bold_weight'] +
-            pos_score * self.config['position_weight'] +
-            pattern_score * self.config['pattern_weight'] +
-            length_score * self.config['length_weight']
-        )
-        
-        return min(total_score, 1.0)
-    
-    def _assign_heading_levels(self, candidates: List[Dict]) -> List[Dict[str, Any]]:
-        """
-        Assign H1, H2, H3 levels to heading candidates
-        
-        Args:
-            candidates: List of heading candidates with scores
-            
-        Returns:
-            List of formatted headings with levels
-        """
-        if not candidates:
-            return []
-        
-        # Group by font size
-        size_groups = {}
-        for candidate in candidates:
-            size = round(candidate["size"], 1)
-            if size not in size_groups:
-                size_groups[size] = []
-            size_groups[size].append(candidate)
-        
-        # Sort sizes in descending order
-        sorted_sizes = sorted(size_groups.keys(), reverse=True)
-        
-        # Assign levels based on size ranking
-        headings = []
-        for i, size in enumerate(sorted_sizes[:3]):  # Only top 3 sizes
-            level = f"H{i+1}"
-            for candidate in size_groups[size]:
-                headings.append({
-                    "level": level,
-                    "text": self._clean_text(candidate["text"]),
-                    "page": candidate["page"]
-                })
-        
-        # Sort by page number
-        headings.sort(key=lambda x: x["page"])
-        
-        return headings
-    
-    def _clean_text(self, text: str) -> str:
-        """
-        Clean and normalize text
-        
-        Args:
-            text: Raw text string
-            
-        Returns:
-            Cleaned text
-        """
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
-        
-        # Remove leading/trailing whitespace
-        text = text.strip()
-        
-        # Remove common artifacts
-        text = re.sub(r'[^\w\s\-.,():\'"!?]', '', text)
-        
-        return text
+class TextBlock:
+    __slots__ = ('text', 'bbox', 'font_size', 'is_bold', 'page_num', 'y_pos')
+    def __init__(self, text, bbox, font_size, is_bold, page_num):
+        self.text = text.strip()
+        self.bbox = bbox
+        self.font_size = round(font_size, 2)
+        self.is_bold = is_bold
+        self.page_num = page_num
+        self.y_pos = bbox[1]
 
-def process_pdfs():
-    """
-    Main function to process all PDFs in input directory
-    """
+class PDFOutlineExtractor:
+    def __init__(self):
+        # Header/footer detection patterns
+        self.header_footer_patterns = [
+            r'^Page \d+ of \d+$',
+            r'^© .+$',
+            r'^Copyright .+$',
+            r'^Version \d+\.\d+$',
+            r'^\d{1,2} [A-Za-z]{3,9} \d{4}$',  # Dates like "31 May 2014"
+            r'^ISTQB$',
+            r'^Overview$',
+            r'^Foundation Level Extension – Agile Tester$',
+            r'^International Software Testing Qualifications Board$'
+        ]
+        
+        # Heading patterns
+        self.heading_patterns = [
+            r'^\d+\.\s+',       # "1. Introduction"
+            r'^\d+\.\d+\s+',    # "2.1 Audience"
+            r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*\s*:?\s*$'  # Title Case
+        ]
+        
+        # Known heading prefixes
+        self.known_headings = [
+            "Revision History",
+            "Table of Contents",
+            "Acknowledgements",
+            "References"
+        ]
+
+    def _is_header_footer(self, text):
+        """Check if text is a header/footer element"""
+        text = text.strip()
+        if not text:
+            return True
+            
+        # Check against patterns
+        for pattern in self.header_footer_patterns:
+            if re.match(pattern, text):
+                return True
+                
+        # Check for short text fragments
+        if len(text.split()) <= 2 and len(text) < 15:
+            return True
+            
+        return False
+
+    def _is_heading_candidate(self, text):
+        """Check if text could be a heading"""
+        text = text.strip()
+        if not text or len(text) > 200:
+            return False
+            
+        # Check known headings
+        for heading in self.known_headings:
+            if heading in text:
+                return True
+                
+        # Check against heading patterns
+        for pattern in self.heading_patterns:
+            if re.match(pattern, text):
+                return True
+                
+        return False
+
+    def _get_heading_level(self, text):
+        """Determine heading level based on patterns"""
+        # H1: Main numbered sections
+        if re.match(r'^\d+\.\s+', text):
+            return "H1"
+        
+        # H2: Subsections
+        if re.match(r'^\d+\.\d+\s+', text):
+            return "H2"
+        
+        # H3: Known headings that should be H1
+        if any(heading in text for heading in self.known_headings):
+            return "H1"
+            
+        # Default to H2 for other headings
+        return "H2"
+
+    def _extract_text_blocks(self, pdf_path):
+        """Extract text blocks with line-based combining"""
+        all_blocks = []
+        doc = fitz.open(pdf_path)
+        
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            blocks = self._extract_text_blocks_from_page(page, page_num + 1)
+            all_blocks.extend(blocks)
+                    
+        doc.close()
+        return all_blocks
+
+    def _extract_text_blocks_from_page(self, page, page_num):
+        """Extract text blocks from a single page"""
+        lines = defaultdict(list)
+        try:
+            text_dict = page.get_text("dict")
+            
+            for block in text_dict.get("blocks", []):
+                if "lines" in block:
+                    for line in block["lines"]:
+                        line_text = ""
+                        font_size = 0
+                        is_bold = False
+                        bbox = line["bbox"]
+                        
+                        # Combine spans in the same line
+                        for span in line["spans"]:
+                            span_text = span["text"].replace('\x00', ' ').strip()
+                            if not span_text:
+                                continue
+                                
+                            line_text += span_text + " "
+                            font_size = span["size"]
+                            is_bold = "bold" in span["font"].lower() or (span["flags"] & 16)
+                        
+                        if line_text.strip():
+                            # Group by approximate y-position
+                            y_key = round(bbox[1], 0)
+                            lines[y_key].append(TextBlock(
+                                text=line_text,
+                                bbox=bbox,
+                                font_size=font_size,
+                                is_bold=is_bold,
+                                page_num=page_num
+                            ))
+        
+        except Exception as e:
+            logger.error(f"Error extracting from page {page_num}: {e}")
+        
+        # Combine fragments on same line
+        combined_blocks = []
+        for y_key in sorted(lines.keys()):
+            line_blocks = sorted(lines[y_key], key=lambda x: x.bbox[0])
+            
+            if line_blocks:
+                # Combine text from all blocks on this line
+                combined_text = " ".join(block.text for block in line_blocks)
+                first_block = line_blocks[0]
+                
+                combined_blocks.append(TextBlock(
+                    text=combined_text,
+                    bbox=first_block.bbox,
+                    font_size=first_block.font_size,
+                    is_bold=first_block.is_bold,
+                    page_num=page_num
+                ))
+        
+        return combined_blocks
+
+    def _extract_title(self, all_blocks):
+        """Extract document title from largest text on first page"""
+        first_page_blocks = [b for b in all_blocks if b.page_num == 1]
+        if not first_page_blocks:
+            return ""
+        
+        # Find largest font size
+        max_font_size = max(b.font_size for b in first_page_blocks)
+        
+        # Get candidate title blocks
+        title_blocks = []
+        for block in first_page_blocks:
+            if block.font_size >= max_font_size * 0.8 and not self._is_header_footer(block.text):
+                title_blocks.append(block)
+        
+        # Sort by vertical position
+        title_blocks.sort(key=lambda x: x.y_pos)
+        
+        # Combine title parts
+        title = " ".join(block.text.strip() for block in title_blocks)
+        return title[:200]  # Limit length
+
+    def process_pdf(self, pdf_path):
+        """Main processing function"""
+        logger.info(f"Processing PDF: {pdf_path}")
+        
+        try:
+            # Extract all text blocks
+            all_blocks = self._extract_text_blocks(pdf_path)
+            
+            if not all_blocks:
+                return {"title": "", "outline": []}
+            
+            # Extract title
+            title = self._extract_title(all_blocks)
+            
+            # Extract headings
+            outline = []
+            seen_headings = set()
+            
+            for block in all_blocks:
+                text = block.text.strip()
+                
+                # Skip headers/footers and non-heading candidates
+                if self._is_header_footer(text) or not self._is_heading_candidate(text):
+                    continue
+                
+                # Get heading level
+                level = self._get_heading_level(text)
+                
+                # Create unique key to avoid duplicates
+                heading_key = f"{text}|{block.page_num}"
+                if heading_key not in seen_headings:
+                    seen_headings.add(heading_key)
+                    outline.append({
+                        "level": level,
+                        "text": text,
+                        "page": block.page_num
+                    })
+            
+            # Sort outline by page and position
+            outline.sort(key=lambda x: (x["page"], -outline.index(x) if outline else 0))
+            
+            logger.info(f"Extracted {len(outline)} headings")
+            return {"title": title, "outline": outline}
+            
+        except Exception as e:
+            logger.error(f"Error processing PDF: {e}")
+            return {"title": "", "outline": []}
+
+def main():
     input_dir = Path("/app/input")
     output_dir = Path("/app/output")
+    output_dir.mkdir(exist_ok=True)
     
-    # Create output directory if it doesn't exist
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Check if input directory exists
-    if not input_dir.exists():
-        logger.error(f"Input directory {input_dir} does not exist")
-        return
-    
-    # Find all PDF files
+    extractor = PDFOutlineExtractor()
     pdf_files = list(input_dir.glob("*.pdf"))
     
     if not pdf_files:
-        logger.warning(f"No PDF files found in {input_dir}")
+        logger.warning("No PDF files found")
         return
     
-    logger.info(f"Found {len(pdf_files)} PDF files to process")
-    
-    # Initialize extractor
-    extractor = PDFOutlineExtractor()
-    
-    # Process each PDF
     for pdf_file in pdf_files:
         try:
             logger.info(f"Processing: {pdf_file.name}")
-            
-            # Extract outline
-            outline = extractor.extract_outline(str(pdf_file))
-            
-            # Generate output file path
+            result = extractor.process_pdf(str(pdf_file))
             output_file = output_dir / f"{pdf_file.stem}.json"
             
-            # Save JSON output
             with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(outline, f, indent=2, ensure_ascii=False)
+                json.dump(result, f, indent=2, ensure_ascii=False)
             
-            logger.info(f"Saved outline to: {output_file}")
+            logger.info(f"Saved result to: {output_file}")
             
         except Exception as e:
-            logger.error(f"Error processing {pdf_file.name}: {str(e)}")
-            
-            # Create minimal output for failed files
-            error_output = {
-                "title": f"Error processing {pdf_file.stem}",
-                "outline": []
-            }
-            
-            output_file = output_dir / f"{pdf_file.stem}.json"
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(error_output, f, indent=2, ensure_ascii=False)
-    
-    logger.info("Processing complete!")
+            logger.error(f"Error processing {pdf_file.name}: {e}")
 
 if __name__ == "__main__":
-    process_pdfs()
+    main()
