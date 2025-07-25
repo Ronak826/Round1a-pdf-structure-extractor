@@ -79,6 +79,11 @@ docker build --platform linux/amd64 -t pdfoutlineextractor:round1a .
  docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \  pdfoutlineextractor:round1a
 ```
 
+### For windows
+```bash
+docker run --rm -v ${PWD}/input:/app/input -v ${PWD}/output:/app/output --network none pdfoutlineextractor:round1a
+```
+
 ## 📝 Final Notes
 
 - We focused on making the solution as **accurate** and **fast** as possible.
