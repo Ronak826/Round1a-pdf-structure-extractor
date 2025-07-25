@@ -1,144 +1,84 @@
-📄 PDF Outline Extractor
-A fast, accurate, and offline-capable tool to extract the title and hierarchical headings (H1, H2, H3) with page numbers from PDF documents, outputting a clean JSON outline.
+# 📄 PDF Outline Extractor
 
-🎯 Problem Statement
-The goal is to extract a structured, hierarchical outline from PDF documents (up to 50 pages), accurately capturing the following elements:
+A fast, accurate, and offline-capable tool to extract the **title** and **hierarchical headings (H1, H2, H3)** with page numbers from PDF documents, outputting a clean and structured **JSON outline**.
 
-Document Title
+---
 
-Headings: H1, H2, and H3, complete with their respective levels and page numbers.
+## 🎯 Problem Statement
 
-This tool is designed to be lightweight, fast, and completely self-contained, running in an offline environment.
+The goal is to extract a structured, hierarchical outline from PDF documents (up to 50 pages), accurately capturing:
 
-✨ Features
-Title & Heading Extraction: Identifies the main title and up to three levels of headings (H1, H2, H3).
+- **Document Title**
+- **Headings**: H1, H2, and H3 — with hierarchy and page numbers
 
-Structured JSON Output: Exports the extracted outline in a clean, easy-to-parse JSON format, including page numbers.
+This tool is **lightweight**, **fast**, and **self-contained**, capable of running completely **offline**.
 
-Offline & Secure: Operates without any internet connection, ensuring data privacy and security.
+---
 
-Optimized for CPU: Runs efficiently on standard linux/amd64 architecture without requiring a GPU.
+## ✨ Features
 
-Dockerized Environment: Encapsulated in a Docker container for consistent, dependency-free execution.
+- ✅ **Title & Heading Extraction**  
+  Detects the main title and heading levels (H1, H2, H3)
 
-High Performance: Processes a 50-page PDF in under 10 seconds.
+- 📦 **Structured JSON Output**  
+  Outputs a clean JSON outline with text, level, and page numbers
 
-Lightweight Footprint: The entire model and library footprint is under 200 MB.
+- 🔐 **Offline & Secure**  
+  Runs without internet — ensuring full privacy
 
-⚙️ How It Works: Weighted Scoring System
-To robustly and accurately detect headings, we employ a weighted scoring system that analyzes multiple typography and layout features. This multi-factor approach ensures high precision and recall across varied PDF layouts.
+- ⚙️ **Optimized for CPU**  
+  Compatible with standard `linux/amd64` CPUs — no GPU needed
 
-A score is assigned to each text block based on the following criteria:
+- 🐳 **Dockerized Environment**  
+  Fully containerized for consistent and dependency-free execution
 
-Feature
+- ⚡ **High Performance**  
+  Processes a 50-page PDF in under **10 seconds**
 
-Weight
+- 🧊 **Lightweight Footprint**  
+  Entire system < **200 MB**
 
-Description
+---
 
-Font Size
+## ⚙️ How It Works: Weighted Scoring System
+We don’t rely on just one thing like font size — instead, we use a Weighted Scoring System to detect heading levels smartly:
+To identify headings, the tool uses a **weighted scoring system** based on typography and layout cues:
 
-35%
+| Feature            | Weight | Description                                                  |
+|--------------------|--------|--------------------------------------------------------------|
+| **Font Size**      | 35%    | Scored relative to the document’s median font size          |
+| **Bold Detection** | 25%    | Detects bold or semi-bold font weight                       |
+| **Positioning**    | 15%    | Analyzes left-alignment and vertical spacing                |
+| **Pattern Matching** | 15%  | Recognizes common numbering patterns (e.g., 1., 1.1, A.)     |
+| **Length Check**   | 10%    | Filters out unusually short or long candidates              |
 
-Scored relative to the median font size of the document.
+This multi-factor method ensures **high precision and recall** across diverse PDF styles.
 
-Bold Detection
+---
 
-25%
 
-Flags text with bold or semi-bold font weights.
+### 🛠️ Step 1: Build the Docker Image
 
-Position Analysis
-
-15%
-
-Analyzes left-alignment and vertical spacing patterns.
-
-Pattern Matching
-
-15%
-
-Recognizes common numbering schemes (e.g., 1., 1.1, A.).
-
-Length Validation
-
-10%
-
-Filters out text blocks that are too short or long to be headings.
-
-🚀 Getting Started
-Prerequisites
-Docker must be installed and running on your system.
-
-1. Build the Docker Image
-Build the image using the provided Dockerfile. The platform is explicitly set to linux/amd64 for compatibility.
 
 docker build --platform linux/amd64 -t pdfoutlineextractor:round1a .
 
-2. Run the Extractor
-Place your input PDFs into a local directory (e.g., input). The tool will process them and place the JSON output into another local directory (e.g., output).
 
-Create input and output directories: mkdir -p input output
+Step 3: Run the Extractor
+docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \ pdfoutlineextractor:round1a
 
-Place your PDF files inside the input directory.
-
-Run the container using the following command. This mounts your local directories and disables networking for security.
-
-docker run --rm \
-  -v $(pwd)/input:/app/input \
-  -v $(pwd)/output:/app/output \
-  --network none \
-  pdfoutlineextractor:round1a
-
-The corresponding JSON files will appear in your output directory.
-
-📋 Example JSON Output
-For a given input PDF, the tool will generate a .json file with a structure similar to this:
+Example JSON Output
 
 {
-  "title": "A Study of Advanced Machine Learning Techniques",
-  "outline": [
-    {
-      "level": 1,
-      "text": "1. Introduction",
-      "page": 3
-    },
-    {
-      "level": 2,
-      "text": "1.1 Background and Motivation",
-      "page": 4
-    },
-    {
-      "level": 1,
-      "text": "2. Neural Network Architectures",
-      "page": 10
-    },
-    {
-      "level": 2,
-      "text": "2.1 Convolutional Neural Networks",
-      "page": 12
-    },
-    {
-      "level": 3,
-      "text": "2.1.1 LeNet-5",
-      "page": 13
-    }
+  "title": "Sample PDF Title",
+  "headings": [
+    { "level": "H1", "text": "1. Introduction", "page": 1 },
+    { "level": "H2", "text": "1.1 Background", "page": 2 },
+    { "level": "H2", "text": "1.2 Purpose", "page": 2 },
+    { "level": "H1", "text": "2. Methodology", "page": 3 },
+    { "level": "H3", "text": "2.1.1 Data Sources", "page": 4 }
   ]
 }
 
-📊 Technical Constraints & Compliance
-The tool operates under a strict set of performance and resource constraints:
 
-Execution Time: Less than 10 seconds for a standard 50-page PDF.
 
-Resource Footprint: Total size of libraries and models is less than 200 MB.
 
-Runtime Environment:
-
-Architecture: CPU-only (linux/amd64)
-
-CPUs: 8 cores
-
-RAM: 16 GB
-
-Network: Fully offline operation with no internet or external API calls permitted.
