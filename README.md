@@ -74,7 +74,11 @@ This multi-factor method ensures **high precision and recall** across diverse PD
 
 ### Step 2: Run the Extractor
 
-- docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \ pdfoutlineextractor:round1a
+->  docker run --rm \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  --network none \
+  pdfoutlineextractor:round1a
 
 
 ## 📝 Final Notes
