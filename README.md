@@ -56,18 +56,28 @@ This multi-factor method ensures **high precision and recall** across diverse PD
 
 ---
 
+## 🧰 Tech Stack
+
+| Component         | Details                          |
+|------------------|----------------------------------|
+| **Language**      | Python 3.10+                     |
+| **Library Used**  | PyMuPDF (`fitz`)                |
+| **Runtime**       | Dockerized, CPU-only (`amd64`)   |
+| **Internet**      | Not Required ✅                  |
+| **GPU**           | Not Used ✅                      |
+| **Model/Lib Size**| ≤ 200 MB ✅                       |
+
 
 ### 🛠️ Step 1: Build the Docker Image
 
+- docker build --platform linux/amd64 -t pdfoutlineextractor:round1a .
 
-docker build --platform linux/amd64 -t pdfoutlineextractor:round1a .
+### Step 2: Run the Extractor
 
+- docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \ pdfoutlineextractor:round1a
 
-Step 3: Run the Extractor
-docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \ pdfoutlineextractor:round1a
-
-Example JSON Output
-
+ ### Example JSON Output
+ 
 {
   "title": "Sample PDF Title",
   "headings": [
@@ -80,5 +90,9 @@ Example JSON Output
 }
 
 
+## 📝 Final Notes
 
-
+- We focused on making the solution as **accurate** and **fast** as possible.
+- All logic is **generalized** — nothing is hardcoded for specific files or formats.
+- We carefully chose **fast and reliable libraries** after comparing multiple options.
+- The codebase is **modular** and designed for easy extension in the next round.
