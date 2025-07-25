@@ -69,17 +69,15 @@ This multi-factor method ensures **high precision and recall** across diverse PD
 
 
 ### 🛠️ Step 1: Build the Docker Image
-
+```bash
 - docker build --platform linux/amd64 -t pdfoutlineextractor:round1a .
+```
 
 ### Step 2: Run the Extractor
 
-->  docker run --rm \
-  -v $(pwd)/input:/app/input \
-  -v $(pwd)/output:/app/output \
-  --network none \
-  pdfoutlineextractor:round1a
-
+```bash
+->  docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \  pdfoutlineextractor:round1a
+```
 
 ## 📝 Final Notes
 
