@@ -6,12 +6,18 @@ import logging
 from collections import defaultdict
 import statistics
 
+
+
+## Added some Comments for better Understanding 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 class TextBlock:
     __slots__ = ('text', 'bbox', 'font_size', 'is_bold', 'page_num', 'y_pos')
+    
     def __init__(self, text, bbox, font_size, is_bold, page_num):
         self.text = text.strip()
         self.bbox = bbox
@@ -20,9 +26,10 @@ class TextBlock:
         self.page_num = page_num
         self.y_pos = bbox[1]
 
+
 class PDFOutlineExtractor:
     def __init__(self):
-        # Header/footer detection patterns
+        # Patterns to identify headers and footers
         self.header_footer_patterns = [
             r'^Page \d+ of \d+$',
             r'^© .+$',
@@ -35,14 +42,14 @@ class PDFOutlineExtractor:
             r'^International Software Testing Qualifications Board$'
         ]
         
-        # Heading patterns
+        # Patterns to identify headings
         self.heading_patterns = [
             r'^\d+\.\s+',       # "1. Introduction"
             r'^\d+\.\d+\s+',    # "2.1 Audience"
             r'^[A-Z][a-z]+(\s+[A-Z][a-z]+)*\s*:?\s*$'  # Title Case
         ]
         
-        # Known heading prefixes
+        # Known heading text
         self.known_headings = [
             "Revision History",
             "Table of Contents",
@@ -51,7 +58,7 @@ class PDFOutlineExtractor:
         ]
 
     def _is_header_footer(self, text):
-        """Check if text is a header/footer element"""
+        """Check if text is a header or footer element"""
         text = text.strip()
         if not text:
             return True
@@ -118,6 +125,7 @@ class PDFOutlineExtractor:
     def _extract_text_blocks_from_page(self, page, page_num):
         """Extract text blocks from a single page"""
         lines = defaultdict(list)
+        
         try:
             text_dict = page.get_text("dict")
             
@@ -243,6 +251,7 @@ class PDFOutlineExtractor:
             logger.error(f"Error processing PDF: {e}")
             return {"title": "", "outline": []}
 
+
 def main():
     input_dir = Path("/app/input")
     output_dir = Path("/app/output")
@@ -268,6 +277,7 @@ def main():
             
         except Exception as e:
             logger.error(f"Error processing {pdf_file.name}: {e}")
+
 
 if __name__ == "__main__":
     main()
