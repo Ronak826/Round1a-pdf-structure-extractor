@@ -4,7 +4,7 @@ A fast, accurate, and offline-capable tool to extract the **title** and **hierar
 
 ---
 
-## 🎯 Problem Statement
+## Problem Statement
 
 The goal is to extract a structured, hierarchical outline from PDF documents (up to 50 pages), accurately capturing:
 
@@ -15,32 +15,32 @@ This tool is **lightweight**, **fast**, and **self-contained**, capable of runni
 
 ---
 
-## ✨ Features
+## Features
 
-- ✅ **Title & Heading Extraction**  
+-  **Title & Heading Extraction**  
   Detects the main title and heading levels (H1, H2, H3)
 
-- 📦 **Structured JSON Output**  
+-  **Structured JSON Output**  
   Outputs a clean JSON outline with text, level, and page numbers
 
-- 🔐 **Offline & Secure**  
+-  **Offline & Secure**  
   Runs without internet — ensuring full privacy
 
-- ⚙️ **Optimized for CPU**  
+-  **Optimized for CPU**  
   Compatible with standard `linux/amd64` CPUs — no GPU needed
 
-- 🐳 **Dockerized Environment**  
+-  **Dockerized Environment**  
   Fully containerized for consistent and dependency-free execution
 
-- ⚡ **High Performance**  
+- **High Performance**  
   Processes a 50-page PDF in under **10 seconds**
 
-- 🧊 **Lightweight Footprint**  
+- **Lightweight Footprint**  
   Entire system < **200 MB**
 
 ---
 
-## ⚙️ How It Works: Weighted Scoring System
+##  How It Works: Weighted Scoring System
 We don’t rely on just one thing like font size — instead, we use a Weighted Scoring System to detect heading levels smartly:
 To identify headings, the tool uses a **weighted scoring system** based on typography and layout cues:
 
@@ -56,16 +56,16 @@ This multi-factor method ensures **high precision and recall** across diverse PD
 
 ---
 
-## 🧰 Tech Stack
+##  Tech Stack
 
 | Component         | Details                          |
-|------------------|----------------------------------|
+|------------------|---------------------------------- |
 | **Language**      | Python 3.10+                     |
-| **Library Used**  | PyMuPDF (`fitz`)                |
+| **Library Used**  | PyMuPDF (`fitz`)                 |
 | **Runtime**       | Dockerized, CPU-only (`amd64`)   |
-| **Internet**      | Not Required ✅                  |
-| **GPU**           | Not Used ✅                      |
-| **Model/Lib Size**| ≤ 200 MB ✅                       |
+| **Internet**      | Not Required                     |
+| **GPU**           | Not Used                         |
+| **Model/Lib Size**| ≤ 200 MB                         |
 
 
 ### 🛠️ Step 1: Build the Docker Image
@@ -75,19 +75,6 @@ This multi-factor method ensures **high precision and recall** across diverse PD
 ### Step 2: Run the Extractor
 
 - docker run --rm \ -v $(pwd)/input:/app/input \ -v $(pwd)/output:/app/output \ --network none \ pdfoutlineextractor:round1a
-
- ### Example JSON Output
- 
-{
-  "title": "Sample PDF Title",
-  "headings": [
-    { "level": "H1", "text": "1. Introduction", "page": 1 },
-    { "level": "H2", "text": "1.1 Background", "page": 2 },
-    { "level": "H2", "text": "1.2 Purpose", "page": 2 },
-    { "level": "H1", "text": "2. Methodology", "page": 3 },
-    { "level": "H3", "text": "2.1.1 Data Sources", "page": 4 }
-  ]
-}
 
 
 ## 📝 Final Notes
