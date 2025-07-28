@@ -67,6 +67,11 @@ This multi-factor method ensures **high precision and recall** across diverse PD
 | **GPU**           | Not Used                         |
 | **Model/Lib Size**| ≤ 200 MB                         |
 
+### Current Input and Output Structure 
+<img width="365" height="332" alt="image" src="https://github.com/user-attachments/assets/02e3c3ae-f3bc-495b-af12-546e4117c9c5" />
+
+
+### Remove Files from Output folder before Running
 
 ### 🛠️ Step 1: Build the Docker Image
 ```bash
